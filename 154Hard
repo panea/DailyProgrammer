@@ -1,0 +1,187 @@
+#Be sure to have installed the two packages bellow
+#
+# To play the game simply run the whole script! 
+#
+# Author: Paul Neag
+#   Date: 2014/04/02
+
+#install.packages("svDialogs")
+
+require(svDialogs)
+
+#Moving function: no direct use
+Move<-function(board,player,nplayer){
+  if(board[nplayer]=="(¤¤)"){
+    if(substr(board[player],2,2)=="ô"){
+    am<-sample(x=c("[o ]","[o$]","[ô ]","[ô$]"),1,prob=c(0.1,0.2,0.4,0.3))
+    Gboard[nplayer]<<-am
+    Gboard[player]<<-paste("[ ",substr(board[player],3,4),sep="")
+      if(substr(board[player],3,3)==" "){ Gboard[player]<<-"[ .]"}
+    Player<<-nplayer; print("You've slain a beast!")
+    if(substr(am,2,2)=="o")print("But you've lost your blade!")
+    W<<-W+1
+    Points<<-Points+10 ;return(F)
+    }else{
+    print(paste("Death by Wumpus. Total points: ",Points)); return(T)
+    }
+  }else if(board[nplayer]=="[><]"){
+    print(paste("Spiked to death. Total points: ",Points)); return(T)
+  }else{
+    if(board[nplayer]!="[ .]"){Points<<-Points+1; print("New room!")}else{Points<<-(Points-1);print("Looks familiar.")}
+    Gboard[nplayer]<<-paste("[",substr(board[player],2,2),substr(board[nplayer],3,4),sep="") 
+    Gboard[player]<<-if(substr(board[player],3,3)==" "){"[ .]"}else{paste("[ ",substr(board[player],3,4),sep="")}
+    Player<<-nplayer; return(F)
+  }
+}
+
+#Looting function: no direct use
+Loot<-function(board,player,nplayer){
+  if(substr(board[player],3,3)=="$"){Gboard[player]<<-paste("[",substr(board[player],2,2)," ]",sep="");Points<<-Points+5; print("Cash money!")
+  }else if(substr(board[player],3,3)=="»"){Gboard[player]<<-"[ô ]";Points<<-Points+5; print ("Weaponized!")
+  }else{print("Nothing to loot.")};return(F)}
+
+#Sneak a peek option, -5 points
+Peek<-function(board,player,dir){
+
+  if(dir=="Left"){SPlayer<-player;SPlayer[1,2]<-SPlayer[1,2]-1
+  }else if(dir=="Right"){SPlayer<-player;SPlayer[1,2]<-SPlayer[1,2]+1
+  }else if(dir=="Down"){SPlayer<-player;SPlayer[1,1]<-SPlayer[1,1]+1
+  }else if(dir=="Up"){SPlayer<-player;SPlayer[1,1]<-SPlayer[1,1]-1}
+  M<<-M+1
+  try(print(paste("In that room you see:",board[SPlayer])),T);return(F)
+}
+
+#Play the game, specify board dimension (default 10)
+#N<-strtoi(dlgInput("Enter game-board dimension",default=10)$res)
+#N<-strtoi(dlgList("Enter game-board dimension",default=10)$res)
+
+if(substr(dlgList(c("Quick [6 dim  -15 moves]","Long  [10 dim-30 moves]"))$res,1,1)=="Q"){
+  N<-6;M<-15  
+}else{
+  N<-10;M<-30
+}
+
+MODE<-dlgList(c("Score mode","Hunt mode"))$res
+
+
+#Create GameBoard
+wY<-rep(seq(N,1,-1),N);wX<-rep(seq(1,N),each=N)
+Nboard<-(matrix(seq(1,N**2,1),N,N)); Gboard<<-matrix("[  ]",N,N)
+Rooms<-seq(1,N**2); Unexplored<-Rooms
+Points<-0;W<-0;niv<-10
+
+#Generate specials
+Entrance<-sample(union(union(Nboard[1,],Nboard[,N]),union(Nboard[N,],Nboard[,1])),1);Rooms[Entrance]<-0
+Wumpus<-sample(Rooms[which(Rooms>0)],floor(0.15*N**2));Rooms[Wumpus]<-0
+Pit<-sample(Rooms[which(Rooms>0)],floor(0.05*N**2));Rooms[Pit]<-0
+Gold<-sample(Rooms[which(Rooms>0)],floor(0.15*N**2));Rooms[Gold]<-0
+Weapon<-sample(Rooms[which(Rooms>0)],floor(0.15*N**2));Rooms[Weapon]<-0
+
+#Set characters
+Gboard[Entrance]<-"{o }"
+Gboard[Wumpus]<-"(¤¤)"
+Gboard[Gold]<-"[ $]"
+Gboard[Pit]<-"[><]"
+Gboard[Weapon]<-"[ »]"
+
+# Preapare player
+Player<- arrayInd(Entrance, dim(Gboard))
+Gboard.vis<-matrix("[  ]",N,N)
+Gboard.vis[Entrance]<-Gboard[Entrance]
+Nboard[Player]<-0
+
+#Display Gameboard
+plot(wX,wY,cex=0,xaxt='n',yaxt='n',xlab="",ylab="",main=paste("Total points: ",Points, "Wumpus killed:",W,"Moves left:",M))
+text(wX,wY,labels=(as.vector(Gboard.vis))) 
+#abline(v=wL,h=wL,ylim=c(0,N),xlim=c(0,N))
+Adj<-rbind(
+  c(Player[1,1]+1,Player[1,2]),c(Player[1,1]-1,Player[1,2]),
+  c(Player[1,1],Player[1,2]+1),c(Player[1,1],Player[1,2]-1))
+Adj<-Adj[!((!apply(!(Adj>N),1,prod))|!(apply(!(Adj<1),1,prod))),]
+
+#Game loop
+
+repeat{
+  M<-(M-1)
+  
+
+  Adj<-rbind(
+    c(Player[1,1]+1,Player[1,2]),c(Player[1,1]-1,Player[1,2]),
+    c(Player[1,1],Player[1,2]+1),c(Player[1,1],Player[1,2]-1))
+  Adj<-Adj[!((!apply(!(Adj>N),1,prod))|!(apply(!(Adj<1),1,prod))),]
+  if(sum(match(Gboard[Adj],"(¤¤)",0))>0)print("I hear something...")
+  if(sum(match(Gboard[Adj],"[><]",0))>0)print("I'd better watch my feet...")
+  writeLines("\n")
+  
+  Choice<-dlgList(choices=c("Left","Right","Up","Down","Loot","Peek","   ","Exit"))
+
+  if(Choice$res=="Left")
+  {if(Player[1,2]==1){print("You ran into a wall.");d<-F}else{NPlayer<-Player;NPlayer[1,2]<-NPlayer[1,2]-1;d<-Move(Gboard,Player,NPlayer)}
+  }else if(Choice$res=="Right")
+  {if(Player[1,2]==N){print("You ran into a wall.");d<-F}else{NPlayer<-Player;NPlayer[1,2]<-Player[1,2]+1;d<-Move(Gboard,Player,NPlayer)}
+  }else if(Choice$res=="Down")
+  {if(Player[1,1]==N){print("You ran into a wall.");d<-F}else{NPlayer<-Player;NPlayer[1,1]<-Player[1,1]+1;d<-Move(Gboard,Player,NPlayer)}
+  }else if(Choice$res=="Up")
+  {if(Player[1,1]==1){print("You ran into a wall.");d<-F}else{NPlayer<-Player;NPlayer[1,1]<-Player[1,1]-1;d<-Move(Gboard,Player,NPlayer)}
+  }else if(Choice$res=="Loot"){Loot(Gboard,Player,NPlayer)
+  }else if(Choice$res=="Peek"){if(Points<5){print("No money,no honey");d<-F}else{pk<-dlgList(c("Left","Right","Up","Down")); d<-Peek(Gboard,Player,pk$res);Points<-(Points-5)}
+  }else if(Choice$res=="Exit"){print(paste("Goodbye. Total points: ",Points));d<-T}
+  
+  if(d){
+  print(sample(c("You did good pig.","I wish I had known you more.","Valar morghulis."),1))
+  plot(wX,wY,cex=0,xaxt='n',yaxt='n',xlab="",ylab="",main=paste("GAME OVER \n Total points: ",Points, "Wumpus killed:",W,"Moves left:",M))
+  text(wX,wY,labels=as.vector((Gboard)))
+  break}
+  
+  Vis<-rbind(
+    c(Player[1,1]+1,Player[1,2]),c(Player[1,1]-1,Player[1,2]),c(Player[1,1]+1,Player[1,2]+1),c(Player[1,1]-1,Player[1,2]-1),
+    c(Player[1,1],Player[1,2]+1),c(Player[1,1],Player[1,2]-1),c(Player[1,1]-1,Player[1,2]+1),c(Player[1,1]+1,Player[1,2]-1),
+    Player);Vis<-Vis[!((!apply(!(Vis>N),1,prod))|!(apply(!(Vis<1),1,prod))),]
+  
+  
+  Gboard.vis<-matrix("[  ]",N,N)
+  Nboard[Player]<-0;Unexplored<-as.vector(Nboard[Nboard>0])
+  Gboard.vis[Vis]<-Gboard[Vis];Gboard.vis[Unexplored]<-"[  ]"
+  
+  if(Points>=niv & MODE=="Hunt mode"){M<-M+6;niv<-niv+10}
+  
+  plot(wX,wY,cex=0,xaxt='n',yaxt='n',xlab="",ylab="",main=paste("Total points: ",Points, "Wumpus killed:",W,"Moves left:",M))
+  text(wX,wY,labels=as.vector(Gboard.vis))
+  #if(sum(match(Gboard[Adj],"(¤¤)",0))>0)print("I hear something...")
+  #if(sum(match(Gboard[Adj],"[xx]",0))>0)print("I'd better watch my feet...")
+  
+  #if(sample(c(1,0),1,prob=c(0.1,0.9))){
+    #Find<-sample(c("Line","Column"),1)
+    #Wump<-try(strtoi(dlgInput(paste("Find a Wumpus.","What",Find,"?"))$res),T)
+    #if(!is.na(Wump)){
+      #if(Wump>N|Wump<1){print("No prize for you.")}else{
+        
+        #if(Find=="Column" & sum(match(Gboard[,Wump],"(¤¤)",0))>0){print("Good guess.");M<-M+3
+       #                                                           plot(wX,wY,cex=0,xaxt='n',yaxt='n',xlab="",ylab="",main=paste("Total points: ",Points, "Wumpus killed:",W,"Moves left:",M))
+       #                                                           text(wX,wY,labels=as.vector(Gboard.vis))
+       # }
+       # else if(Find=="Line" & sum(match(Gboard[Wump,],"(¤¤)",0))>0){print("Good guess.");M<-M+3
+       #                                                              plot(wX,wY,cex=0,xaxt='n',yaxt='n',xlab="",ylab="",main=paste("Total points: ",Points, "Wumpus killed:",W,"Moves left:",M))
+       #                                                              text(wX,wY,labels=as.vector(Gboard.vis))}
+       # else (print("No luck."))
+     # }
+   # }else{
+   #   print("No prize for you.")
+   # }
+ # }
+  
+  if(length(Wumpus)==W){
+    print("You've exterminated all Wumpus !")
+    print("ALL HAIL THE WUMPUS-DEATH-GOD !")
+    Points<-floor(Points*1.5)
+    plot(wX,wY,cex=0,xaxt='n',yaxt='n',xlab="",ylab="",main=paste("GAME WON \n Total points: ",Points, "Wumpus exterminated "))
+    text(wX,wY,labels=as.vector((Gboard)))
+    break
+  }
+  if(M==0){
+    print("No more moves!")
+    plot(wX,wY,cex=0,xaxt='n',yaxt='n',xlab="",ylab="",main=paste("GAME OVER \n Total points: ",Points, "Wumpus killed:",W,"Moves left:",M))
+    text(wX,wY,labels=as.vector((Gboard)))
+    break
+  }
+}
